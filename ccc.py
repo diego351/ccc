@@ -255,13 +255,14 @@ def handle_upload(args):
     print('Upload successful!')
 
 
-def handle_download(args):
-    def get_local_filename(base_file_name):
-        file_without_extension = Path(base_file_name).stem
-        file_extension = Path(base_file_name).suffix
-        now = datetime.now().isoformat()
-        return f'{file_without_extension}-{now}{file_extension}'
+def get_local_filename(base_file_name):
+    file_without_extension = Path(base_file_name).stem
+    file_extension = Path(base_file_name).suffix
+    now = datetime.now().isoformat()
+    return f'{file_without_extension}-{now}{file_extension}'
 
+
+def handle_download(args):
     api_service = APIService(args.access_token)
 
     signal_batches_iterator = iter(api_service.get_list_signals_batches(new=args.new))
