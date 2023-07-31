@@ -72,7 +72,7 @@ class TestUploadCLIHandler(unittest.TestCase):
         }
         mock_post_new_signal.return_value = response_data
 
-        signal_data = b"Your test signal data"
+        signal_data = b"file content"
         signal_file = MockFileObject(signal_data, "signal_file.pdf")
 
         args = argparse.Namespace(access_token='ACCESS_TOKEN', file_path=signal_file, name="name")
