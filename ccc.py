@@ -277,11 +277,7 @@ def create_parser():
     subparsers = parser.add_subparsers(dest='action', title='Available actions', required=True)
 
     list_parser = subparsers.add_parser(LIST_ACTION, help='List signals')
-    list_parser.add_argument(
-        ACCESS_TOKEN_ARGUMENT,
-        required=True,
-        help='Access token for authentication',
-    )
+    list_parser.add_argument(ACCESS_TOKEN_ARGUMENT, required=True, help='Access token for authentication')
 
     upload_parser = subparsers.add_parser(UPLOAD_ACTION, help='Upload signal')
     upload_parser.add_argument(
@@ -294,10 +290,7 @@ def create_parser():
     download_parser.add_argument(ACCESS_TOKEN_ARGUMENT, required=True, help='Access token for authentication')
     download_parser.add_argument(DIR_PATH_ARGUMENT, help='Download directory path', type=dir_path, required=True)
     download_parser.add_argument(
-        NEW_ARGUMENT,
-        action='store_true',
-        help='Filtering by only new signals',
-        default=False,
+        NEW_ARGUMENT, action='store_true', help='Filtering by only new signals', default=False
     )
 
     return parser
@@ -391,6 +384,10 @@ def handle_download(args: argparse.Namespace):
                 not_downloaded_reports.append(signal)
                 print('Not visited by app before')
                 continue
+
+            except APIService.AccessDeniedError:
+                print(INVALUD_TOKEN_MESSAGE)
+                exit(1)
 
             url = response.get('url')
             file_name = response.get('name')

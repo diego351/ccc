@@ -1,6 +1,6 @@
 # CCC
 
-1. Assuming you have python3 installed open up ccc directory: `cd ccc`
+1. Assuming you have latest python3 installed, open up ccc directory: `cd ccc`
 2. Create virtualenv: `python3 -m venv .venv`
 3. Activate virutalenv: `source .venv/bin/activate`
 4. Install dependencies: `pip install -r requirements.txt`
