@@ -3,12 +3,14 @@ import unittest
 from io import BytesIO, StringIO
 from unittest.mock import ANY, patch
 
+import pytest
+import requests_mock
 from freezegun import freeze_time
 
 from ccc import APIService, PrintService, get_local_filename, handle_download, handle_list, handle_upload
 
 
-class TestListCLIHandler(unittest.TestCase):
+class TestListCLIHandler:
     @patch('ccc.APIService.get_list_signals_batches')
     @patch('ccc.PrintService.print_signals')
     def test_list_handler(self, print_signals, get_list_signals_batches):
@@ -60,7 +62,7 @@ class MockFileObject(BytesIO):
         self.name = name
 
 
-class TestUploadCLIHandler(unittest.TestCase):
+class TestUploadCLIHandler:
     @patch('ccc.APIService.create_new_signal')
     @patch('ccc.APIService.upload_file_to_object_storage')
     def test_upload_handler(self, upload_to_object_storage, create_new_signal):
@@ -83,7 +85,7 @@ class TestUploadCLIHandler(unittest.TestCase):
         )
 
 
-class TestDownloadCLIHandler(unittest.TestCase):
+class TestDownloadCLIHandler:
     @patch('ccc.APIService.get_list_signals_batches')
     @patch('ccc.APIService.request_printout')
     @patch('ccc.download_file_with_progress_bar')
@@ -151,6 +153,71 @@ class TestDownloadCLIHandler(unittest.TestCase):
     @freeze_time('2023-01-01T00:00:00')
     def test_get_local_filename(self):
         assert get_local_filename('test.pdf') == 'test-2023-01-01T00:00:00.pdf'
+
+
+class TestAPIService:
+    def setup_method(self, method):
+        self.access_token = "ACCESS_TOKEN"
+        self.api_service = APIService(self.access_token)
+
+    def test_create_new_signal_success(self):
+        expected_response = {'signal_id': '123'}
+
+        with requests_mock.Mocker() as m:
+            m.post('https://app.cardiomatics.com/api/v2/signals', status_code=201, json=expected_response)
+
+            response = self.api_service.create_new_signal('name', 'example.txt')
+
+            assert m.last_request.headers['Private-Token'] == self.access_token
+            assert response == expected_response
+
+    def test_create_new_signal_failure(self):
+        with requests_mock.Mocker() as m:
+            m.post(
+                'https://app.cardiomatics.com/api/v2/signals',
+                status_code=401,
+                json={"detail": "Incorrect authentication credentials.", "status_code": 401},
+            )
+
+            with pytest.raises(APIService.AccessDeniedError):
+                response = self.api_service.create_new_signal('name', 'example.txt')
+
+            assert m.last_request.headers['Private-Token'] == self.access_token
+
+    def test_request_printout_success(self):
+        with requests_mock.Mocker() as m:
+            m.get(
+                'https://app.cardiomatics.com/api/v2/signals/123/report/printout',
+                status_code=200,
+                json={'test': 'test'},
+            )
+
+            response = self.api_service.request_printout(123)
+
+            assert m.last_request.headers['Private-Token'] == self.access_token
+
+            assert response == {'test': 'test'}
+
+    @pytest.mark.parametrize(
+        "status_code, exception",
+        [
+            (401, APIService.AccessDeniedError),
+            (403, APIService.NotVisitedBeforeViaPortalError),
+            (500, NotImplementedError),
+        ],
+    )
+    def test_request_printout_failure(self, status_code, exception):
+        with requests_mock.Mocker() as m:
+            m.get(
+                'https://app.cardiomatics.com/api/v2/signals/123/report/printout',
+                status_code=status_code,
+                json={'test': 'test'},
+            )
+
+            with pytest.raises(exception):
+                response = self.api_service.request_printout(123)
+
+            assert m.last_request.headers['Private-Token'] == self.access_token
 
 
 if __name__ == '__main__':
