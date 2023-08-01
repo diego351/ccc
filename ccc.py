@@ -65,7 +65,7 @@ class APIService:
 
         elif response.status_code == 200:
             last_page = response.headers['x-total-pages']
-            return (last_page, response.json())
+            return (int(last_page), response.json())
 
         else:
             raise NotImplementedError
@@ -113,12 +113,17 @@ class APIService:
         :param new: filtering by new signals, defaults to None
         :yield: List of signals (JSON)
         """
-        last_page, data = self._get_signals_page(1, new=new)
-        yield data
 
-        for page in range(2, int(last_page) + 1):
-            _, data = self._get_signals_page(page, new=new)
+        current_page = 1
+
+        while True:
+            last_page, data = self._get_signals_page(current_page, new=new)
             yield data
+
+            if current_page >= last_page:
+                break
+
+            current_page += 1
 
     def request_printout(self, signal_id: int):
         """Requests printout for given signal_id
@@ -127,7 +132,7 @@ class APIService:
         :raises self.AccessDeniedError:
         :raises self.NotVisitedBeforeViaPortalError:
         :raises NotImplementedError:
-        :return: printout response (JSON)
+        :return: printout response: dict (JSON)
         """
         url = self._CARTIOMATICS_API_URL + self._REQUEST_PRINTOUT_ENDPOINT.format(signal_id)
         response = self._api_client.get(url)

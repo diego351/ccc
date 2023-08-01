@@ -230,7 +230,7 @@ class TestAPIService:
 
             last_page, response = self.api_service._get_signals_page(1, True)
 
-            assert last_page == '2'
+            assert last_page == 2
             assert response == [{'id': 1}]
 
     def test_get_list_signals_page_failure(self):
@@ -251,14 +251,14 @@ class TestAPIService:
             m.get(
                 'https://app.cardiomatics.com/api/v2/signals?page=1&per_page=1',
                 status_code=200,
-                headers={'x-total-pages': '3'},
+                headers={'x-total-pages': '2'},  # NOTE: at this stage there are just 2 pages
                 json=first_response,
             )
             second_response = [{'id': 2}]
             m.get(
                 'https://app.cardiomatics.com/api/v2/signals?page=2&per_page=1',
                 status_code=200,
-                headers={'x-total-pages': '3'},
+                headers={'x-total-pages': '3'},  # NOTE: someone added new entry in the meantime, now we have 3 pages
                 json=second_response,
             )
             third_response = [{'id': 3}]
@@ -272,6 +272,7 @@ class TestAPIService:
             responses = list(self.api_service.get_list_signals_batches())
 
             assert responses == [first_response, second_response, third_response]
+            # NOTE: successfully asked for all pages, including third one
 
             assert m.call_count == 3
 
