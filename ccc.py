@@ -142,7 +142,13 @@ class APIService:
         else:
             raise NotImplementedError
 
-    def download_file(self, url):
+    def get_file(self, url):
+        """Gets given url
+
+        :param url: URL string
+        :raises NotImplementedError:
+        :return: requests.Response
+        """
         response = requests.get(url, stream=True)
 
         if response.ok:
@@ -218,7 +224,7 @@ def download_file_with_progress_bar(api_service, url, dir_path, file_name):
     download_dest = os.path.join(dir_path, file_name)
 
     try:
-        with api_service.download_file(url) as response:
+        with api_service.get_file(url) as response:
             total = int(response.headers.get('content-length', 0))
             with open(download_dest, 'wb') as file, tqdm(
                 desc=file_name,
