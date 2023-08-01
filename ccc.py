@@ -43,6 +43,13 @@ class APIService:
         self._api_client.headers['Private-Token'] = self._access_token
 
     def _get_signals_request(self, page, new=None):
+        """Requests list signals endpoint
+
+        :param page: pagination page
+        :param new: new filter flag, defaults to None
+        :raises self.AccessDeniedError:
+        :return: tuple (<last_page_index>, <JSON dict>)
+        """
         url = self._CARTIOMATICS_API_URL + self._SIGNALS_ENDPOINT
 
         params = {'page': page, 'per_page': self._PER_PAGE}
@@ -61,7 +68,15 @@ class APIService:
         else:
             raise NotImplementedError
 
-    def post_new_signal(self, name, file_name):
+    def create_new_signal(self, name, file_name):
+        """Requests create signal endpoint
+
+        :param name: signal name
+        :param file_name: file name
+        :raises self.AccessDeniedError:
+        :raises NotImplementedError:
+        :return: response dictionary (JSON dict)
+        """
         url = self._CARTIOMATICS_API_URL + self._SIGNALS_ENDPOINT
 
         response = self._api_client.post(url, json={'name': name, 'file_names_list': [file_name]})
@@ -76,12 +91,26 @@ class APIService:
             raise NotImplementedError
 
     def upload_file_to_object_storage(self, url, file, post_fields):
+        """_summary_
+
+        :param url: object storage url
+        :param file: file object (opened)
+        :param post_fields: object storage credentials
+        :raises self.ObjectStorageUploadError:
+        """
         response = requests.post(url, files={'file': file}, data=post_fields, stream=True)
 
         if not response.ok:
             raise self.ObjectStorageUploadError
 
-    def _get_list_signals_batches(self, new=None):
+        return response
+
+    def get_list_signals_batches(self, new=None):
+        """Direct pagination iterator over get signals endpoint
+
+        :param new: filtering by new signals, defaults to None
+        :yield: List of signals (JSON)
+        """
         last_page, data = self._get_signals_request(1, new=new)
         yield data
 
@@ -89,23 +118,15 @@ class APIService:
             _, data = self._get_signals_request(page, new=new)
             yield data
 
-    def get_list_signals_batches(self, new=None):
-        iterator = iter(self._get_list_signals_batches(new=new))
-
-        while True:
-            try:
-                signals_batch = next(iterator)
-
-            except APIService.AccessDeniedError:
-                print(INVALUD_TOKEN_MESSAGE)
-                exit(1)
-
-            except StopIteration:
-                break
-
-            yield signals_batch
-
     def request_printout(self, signal_id):
+        """Requests printout for given signal_id
+
+        :param signal_id:
+        :raises self.AccessDeniedError:
+        :raises self.NotVisitedBeforeViaPortalError:
+        :raises NotImplementedError:
+        :return: printout response (JSON)
+        """
         url = self._CARTIOMATICS_API_URL + self._REQUEST_PRINTOUT_ENDPOINT.format(signal_id)
         response = self._api_client.get(url)
 
@@ -131,7 +152,68 @@ class APIService:
             raise NotImplementedError
 
 
+class PrintService:
+    """Handles printing signals to console"""
+
+    @classmethod
+    def signals_object_to_column(cls, signal):
+        return [
+            signal.get('id'),
+            signal.get('physician').get('name'),
+            signal.get('created_at'),
+            signal.get('status'),
+            signal.get('new'),
+        ]
+
+    @classmethod
+    def print_signals(cls, signals):
+        """Prints formated signals table
+
+        :param signals: signals dict
+        """
+        columned_data_list = [cls.signals_object_to_column(signal) for signal in signals]
+
+        print(
+            tabulate(
+                columned_data_list,
+                headers=["ID", "Name", "Created at", "Status", "New"],
+                tablefmt="signals-table",
+                showindex=False,
+            )
+        )
+
+
+def get_list_signals_batches_auth_handled(api_service, new=None):
+    """Similar to APIService.get_list_signals_batches(), but handles invalid authorisation
+
+    :param new: filtering by new signals, defaults to None
+    :yield: List of signals (JSON)
+    """
+    iterator = iter(api_service.get_list_signals_batches(new=new))
+
+    while True:
+        try:
+            signals_batch = next(iterator)
+
+        except APIService.AccessDeniedError:
+            print(INVALUD_TOKEN_MESSAGE)
+            exit(1)
+
+        except StopIteration:
+            break
+
+        yield signals_batch
+
+
 def download_file_with_progress_bar(api_service, url, dir_path, file_name):
+    """Downloads file with a progress bar
+
+    :param api_service: APIService instance
+    :param url: source url
+    :param dir_path: download directory
+    :param file_name: destination file name
+    :raises DiskFullError: when disk is full
+    """
     CHUNK_SIZE = 1024
     download_dest = os.path.join(dir_path, file_name)
 
@@ -158,7 +240,14 @@ def download_file_with_progress_bar(api_service, url, dir_path, file_name):
 
 
 def create_parser():
+    """Creates parser that handles CLI arguments"""
+
     def dir_path(string):
+        """Directory validator
+
+        :param string: path
+        :return: path if path is directory
+        """
         if os.path.isdir(string):
             return string
         else:
@@ -174,13 +263,15 @@ def create_parser():
     list_parser.add_argument(ACCESS_TOKEN_ARGUMENT, required=True, help='Access token for authentication')
 
     upload_parser = subparsers.add_parser(UPLOAD_ACTION, help='Upload signal')
-    upload_parser.add_argument('--file-path', help='File path to the signal file', type=argparse.FileType('rb'))
-    upload_parser.add_argument('--name', help="Name")
+    upload_parser.add_argument(
+        '--file-path', help='File path to the signal file', type=argparse.FileType('rb'), required=True
+    )
+    upload_parser.add_argument('--name', help="Name", required=True)
     upload_parser.add_argument(ACCESS_TOKEN_ARGUMENT, required=True, help='Access token for authentication')
 
     download_parser = subparsers.add_parser(DOWNLOAD_ACTION, help='Download action')
     download_parser.add_argument(ACCESS_TOKEN_ARGUMENT, required=True, help='Access token for authentication')
-    download_parser.add_argument('--dir-path', help='Download directory path', type=dir_path)
+    download_parser.add_argument('--dir-path', help='Download directory path', type=dir_path, required=True)
     download_parser.add_argument(
         '--new',
         action='store_true',
@@ -191,50 +282,35 @@ def create_parser():
     return parser
 
 
-def signals_object_to_column(signal):
-    return [
-        signal.get('id'),
-        signal.get('physician').get('name'),
-        signal.get('created_at'),
-        signal.get('status'),
-        signal.get('new'),
-    ]
-
-
-def print_signals(signals):
-    columned_data_list = [signals_object_to_column(signal) for signal in signals]
-
-    print(
-        tabulate(
-            columned_data_list,
-            headers=["ID", "Name", "Created at", "Status", "New"],
-            tablefmt="signals-table",
-            showindex=False,
-        )
-    )
-
-
 def handle_list(args):
+    """List action main handler
+
+    :param args: argparse arguments, required: access_token:str
+    """
     api_service = APIService(args.access_token)
     signals = []
 
-    signal_batches_iterator = iter(api_service.get_list_signals_batches())
+    signal_batches_iterator = iter(get_list_signals_batches_auth_handled(api_service))
 
     for signals_batch in signal_batches_iterator:
         for signal in signals_batch:
             signals.append(signal)
 
     print('\nList of signals:')
-    print_signals(signals)
+    PrintService.print_signals(signals)
 
 
 def handle_upload(args):
+    """Upload action main handler
+
+    :param args: argparse arguments required: access_token:str, name:str, file_path: str
+    """
     api_service = APIService(args.access_token)
 
     file_name = os.path.basename(args.file_path.name)
 
     try:
-        response_dict = api_service.post_new_signal(args.name, file_name)
+        response_dict = api_service.create_new_signal(args.name, file_name)
         print('Sucessfully created object on Cardiomatics API')
 
     except api_service.AccessDeniedError:
@@ -256,6 +332,12 @@ def handle_upload(args):
 
 
 def get_local_filename(base_file_name):
+    """Helper function that creates unique filename to download
+    example-filename.pdf -> example-filename-2023-01-01T00:00:00.pdf
+
+    :param base_file_name: server file name
+    :return: download file name
+    """
     file_without_extension = Path(base_file_name).stem
     file_extension = Path(base_file_name).suffix
     now = datetime.now().isoformat()
@@ -263,9 +345,13 @@ def get_local_filename(base_file_name):
 
 
 def handle_download(args):
+    """Download action main handler
+
+    :param args: argparse arguments. required: access_token:str, new:bool, dir_path:str
+    """
     api_service = APIService(args.access_token)
 
-    signal_batches_iterator = iter(api_service.get_list_signals_batches(new=args.new))
+    signal_batches_iterator = iter(get_list_signals_batches_auth_handled(api_service, new=args.new))
 
     downloaded_reports = []
     not_downloaded_reports = []
@@ -299,11 +385,11 @@ def handle_download(args):
 
     if downloaded_reports:
         print(f'\nDownloaded signal reports: {len(downloaded_reports)}')
-        print_signals(downloaded_reports)
+        PrintService.print_signals(downloaded_reports)
 
     if not_downloaded_reports:
         print('\nNot downloaded reports (due error)')
-        print_signals(not_downloaded_reports)
+        PrintService.print_signals(not_downloaded_reports)
 
     if not (downloaded_reports + not_downloaded_reports):
         print('\nNo signals available')

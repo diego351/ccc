@@ -5,24 +5,24 @@ from unittest.mock import ANY, patch
 
 from freezegun import freeze_time
 
-from ccc import get_local_filename, handle_download, handle_list, handle_upload, print_signals
+from ccc import APIService, PrintService, get_local_filename, handle_download, handle_list, handle_upload
 
 
 class TestListCLIHandler(unittest.TestCase):
     @patch('ccc.APIService.get_list_signals_batches')
-    @patch('ccc.print_signals')
-    def test_list_handler(self, mock_print_signals, mock_get_list_signals_batches):
+    @patch('ccc.PrintService.print_signals')
+    def test_list_handler(self, mock_print_signals, get_list_signals_batches):
         # Mock the API response data
         signals_data = [
             {"id": 1, "physician": {"name": "Dr. Smith"}, "created_at": "2023-07-29", "status": "Done", "new": False},
         ]
-        mock_get_list_signals_batches.return_value = [signals_data]
+        get_list_signals_batches.return_value = [signals_data]
 
         args = argparse.Namespace(access_token='ACCESS_TOKEN')
 
         handle_list(args)
 
-        mock_get_list_signals_batches.assert_called_once_with()
+        get_list_signals_batches.assert_called_once_with(new=None)
 
         mock_print_signals.assert_called_once_with(signals_data)
 
@@ -44,7 +44,7 @@ class TestListCLIHandler(unittest.TestCase):
             },
         ]
         with patch('sys.stdout', new=StringIO()) as fake_out:
-            print_signals(signals_data)
+            PrintService.print_signals(signals_data)
             printed = fake_out.getvalue()
 
         assert printed == (
@@ -62,15 +62,15 @@ class MockFileObject(BytesIO):
 
 
 class TestUploadCLIHandler(unittest.TestCase):
-    @patch('ccc.APIService.post_new_signal')
+    @patch('ccc.APIService.create_new_signal')
     @patch('ccc.APIService.upload_file_to_object_storage')
-    def test_upload_handler(self, mock_upload_to_object_storage, mock_post_new_signal):
+    def test_upload_handler(self, mock_upload_to_object_storage, create_new_signal):
         response_data = {
             "files": [
                 {"post_fields": {"file": "file_data", "file_name": "test_signal.pdf"}, "url": "https://example.com"}
             ]
         }
-        mock_post_new_signal.return_value = response_data
+        create_new_signal.return_value = response_data
 
         signal_data = b"file content"
         signal_file = MockFileObject(signal_data, "signal_file.pdf")
@@ -79,7 +79,7 @@ class TestUploadCLIHandler(unittest.TestCase):
 
         handle_upload(args)
 
-        mock_post_new_signal.assert_called_once_with("name", "signal_file.pdf")
+        create_new_signal.assert_called_once_with("name", "signal_file.pdf")
 
         mock_upload_to_object_storage.assert_called_once_with(
             "https://example.com", signal_file, {"file": "file_data", "file_name": "test_signal.pdf"}
