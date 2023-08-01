@@ -3,7 +3,9 @@ import argparse
 import errno
 import os
 from datetime import datetime
+from io import FileIO
 from pathlib import Path
+from typing import List, Optional
 
 import requests
 from tabulate import tabulate
@@ -36,13 +38,13 @@ class APIService:
     class ObjectStorageUploadError(Exception):
         pass
 
-    def __init__(self, access_token):
+    def __init__(self, access_token: str):
         self._access_token = access_token
         self._api_client = requests.Session()
 
         self._api_client.headers['Private-Token'] = self._access_token
 
-    def _get_signals_request(self, page, new=None):
+    def _get_signals_request(self, page: int, new: Optional[bool] = None):
         """Requests list signals endpoint
 
         :param page: pagination page
@@ -68,7 +70,7 @@ class APIService:
         else:
             raise NotImplementedError
 
-    def create_new_signal(self, name, file_name):
+    def create_new_signal(self, name: str, file_name: str):
         """Requests create signal endpoint
 
         :param name: signal name
@@ -90,7 +92,7 @@ class APIService:
         else:
             raise NotImplementedError
 
-    def upload_file_to_object_storage(self, url, file, post_fields):
+    def upload_file_to_object_storage(self, url: str, file: FileIO, post_fields: dict):
         """Uploads file to object store as multipart/form request
 
         :param url: object storage url
@@ -105,7 +107,7 @@ class APIService:
 
         return response
 
-    def get_list_signals_batches(self, new=None):
+    def get_list_signals_batches(self, new: Optional[bool] = None):
         """Direct pagination iterator over get signals endpoint
 
         :param new: filtering by new signals, defaults to None
@@ -118,7 +120,7 @@ class APIService:
             _, data = self._get_signals_request(page, new=new)
             yield data
 
-    def request_printout(self, signal_id):
+    def request_printout(self, signal_id: int):
         """Requests printout for given signal_id
 
         :param signal_id:
@@ -142,7 +144,7 @@ class APIService:
         else:
             raise NotImplementedError
 
-    def get_file(self, url):
+    def get_file(self, url: str):
         """Gets given url
 
         :param url: URL string
@@ -162,7 +164,7 @@ class PrintService:
     """Handles printing signals to console"""
 
     @classmethod
-    def signals_object_to_column(cls, signal):
+    def signals_object_to_column(cls, signal: dict):
         return [
             signal.get('id'),
             signal.get('physician').get('name'),
@@ -172,7 +174,7 @@ class PrintService:
         ]
 
     @classmethod
-    def print_signals(cls, signals):
+    def print_signals(cls, signals: List[dict]):
         """Prints formated signals table
 
         :param signals: signals dict
@@ -189,7 +191,7 @@ class PrintService:
         )
 
 
-def get_list_signals_batches_auth_handled(api_service, new=None):
+def get_list_signals_batches_auth_handled(api_service: APIService, new: Optional[bool] = None):
     """Similar to APIService.get_list_signals_batches(), but handles invalid authorisation
 
     :param new: filtering by new signals, defaults to None
@@ -211,7 +213,7 @@ def get_list_signals_batches_auth_handled(api_service, new=None):
         yield signals_batch
 
 
-def download_file_with_progress_bar(api_service, url, dir_path, file_name):
+def download_file_with_progress_bar(api_service: APIService, url: str, dir_path: str, file_name: str):
     """Downloads file with a progress bar
 
     :param api_service: APIService instance
@@ -248,14 +250,14 @@ def download_file_with_progress_bar(api_service, url, dir_path, file_name):
 def create_parser():
     """Creates parser that handles CLI arguments"""
 
-    def dir_path(string):
+    def dir_path(path):
         """Directory validator
 
-        :param string: path
+        :param path: directory path ex. /tmp
         :return: path if path is directory
         """
-        if os.path.isdir(string):
-            return string
+        if os.path.isdir(path):
+            return path
         else:
             print('Not a directory')
             exit(1)
@@ -288,7 +290,7 @@ def create_parser():
     return parser
 
 
-def handle_list(args):
+def handle_list(args: argparse.Namespace):
     """List action main handler
 
     :param args: argparse arguments, required: access_token:str
@@ -306,7 +308,7 @@ def handle_list(args):
     PrintService.print_signals(signals)
 
 
-def handle_upload(args):
+def handle_upload(args: argparse.Namespace):
     """Upload action main handler
 
     :param args: argparse arguments required: access_token:str, name:str, file_path: str
@@ -337,7 +339,7 @@ def handle_upload(args):
     print('Upload successful!')
 
 
-def get_local_filename(base_file_name):
+def get_local_filename(base_file_name: str):
     """Helper function that creates unique filename to download
     example-filename.pdf -> example-filename-2023-01-01T00:00:00.pdf
 
@@ -350,7 +352,7 @@ def get_local_filename(base_file_name):
     return f'{file_without_extension}-{now}{file_extension}'
 
 
-def handle_download(args):
+def handle_download(args: argparse.Namespace):
     """Download action main handler
 
     :param args: argparse arguments. required: access_token:str, new:bool, dir_path:str
