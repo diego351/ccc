@@ -44,7 +44,7 @@ class APIService:
 
         self._api_client.headers['Private-Token'] = self._access_token
 
-    def _get_signals_request(self, page: int, new: Optional[bool] = None):
+    def _get_signals_page(self, page: int, new: Optional[bool] = None):
         """Requests list signals endpoint
 
         :param page: pagination page
@@ -113,11 +113,11 @@ class APIService:
         :param new: filtering by new signals, defaults to None
         :yield: List of signals (JSON)
         """
-        last_page, data = self._get_signals_request(1, new=new)
+        last_page, data = self._get_signals_page(1, new=new)
         yield data
 
         for page in range(2, int(last_page) + 1):
-            _, data = self._get_signals_request(page, new=new)
+            _, data = self._get_signals_page(page, new=new)
             yield data
 
     def request_printout(self, signal_id: int):
@@ -263,25 +263,33 @@ def create_parser():
             exit(1)
 
     ACCESS_TOKEN_ARGUMENT = '--access-token'
+    FILE_PATH_ARGUMENT = '--file-path'
+    NAME_ARGUMENT = '--name'
+    DIR_PATH_ARGUMENT = '--dir-path'
+    NEW_ARGUMENT = '--new'
 
     parser = argparse.ArgumentParser(description='Cardiomatics Console Client')
     subparsers = parser.add_subparsers(dest='action', title='Available actions', required=True)
 
     list_parser = subparsers.add_parser(LIST_ACTION, help='List signals')
-    list_parser.add_argument(ACCESS_TOKEN_ARGUMENT, required=True, help='Access token for authentication')
+    list_parser.add_argument(
+        ACCESS_TOKEN_ARGUMENT,
+        required=True,
+        help='Access token for authentication',
+    )
 
     upload_parser = subparsers.add_parser(UPLOAD_ACTION, help='Upload signal')
     upload_parser.add_argument(
-        '--file-path', help='File path to the signal file', type=argparse.FileType('rb'), required=True
+        FILE_PATH_ARGUMENT, help='File path to the signal file', type=argparse.FileType('rb'), required=True
     )
-    upload_parser.add_argument('--name', help="Name", required=True)
+    upload_parser.add_argument(NAME_ARGUMENT, help="Name", required=True)
     upload_parser.add_argument(ACCESS_TOKEN_ARGUMENT, required=True, help='Access token for authentication')
 
     download_parser = subparsers.add_parser(DOWNLOAD_ACTION, help='Download action')
     download_parser.add_argument(ACCESS_TOKEN_ARGUMENT, required=True, help='Access token for authentication')
-    download_parser.add_argument('--dir-path', help='Download directory path', type=dir_path, required=True)
+    download_parser.add_argument(DIR_PATH_ARGUMENT, help='Download directory path', type=dir_path, required=True)
     download_parser.add_argument(
-        '--new',
+        NEW_ARGUMENT,
         action='store_true',
         help='Filtering by only new signals',
         default=False,

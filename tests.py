@@ -180,7 +180,7 @@ class TestAPIService:
             )
 
             with pytest.raises(APIService.AccessDeniedError):
-                response = self.api_service.create_new_signal('name', 'example.txt')
+                self.api_service.create_new_signal('name', 'example.txt')
 
             assert m.last_request.headers['Private-Token'] == self.access_token
 
@@ -215,9 +215,65 @@ class TestAPIService:
             )
 
             with pytest.raises(exception):
-                response = self.api_service.request_printout(123)
+                self.api_service.request_printout(123)
 
             assert m.last_request.headers['Private-Token'] == self.access_token
+
+    def test_get_list_signals_page_success(self):
+        with requests_mock.Mocker() as m:
+            m.get(
+                f'https://app.cardiomatics.com/api/v2/signals?page=1&per_page={self.api_service._PER_PAGE}&new=True',
+                status_code=200,
+                headers={'x-total-pages': '2'},
+                json=[{'id': 1}],
+            )
+
+            last_page, response = self.api_service._get_signals_page(1, True)
+
+            assert last_page == '2'
+            assert response == [{'id': 1}]
+
+    def test_get_list_signals_page_failure(self):
+        with requests_mock.Mocker() as m:
+            m.get(
+                f'https://app.cardiomatics.com/api/v2/signals?page=1&per_page={self.api_service._PER_PAGE}&new=True',
+                status_code=401,
+            )
+
+            with pytest.raises(APIService.AccessDeniedError):
+                self.api_service._get_signals_page(1, True)
+
+    def test_get_list_signals_batches(self):
+        self.api_service._PER_PAGE = 1
+
+        with requests_mock.Mocker() as m:
+            first_response = [{'id': 1}]
+            m.get(
+                'https://app.cardiomatics.com/api/v2/signals?page=1&per_page=1',
+                status_code=200,
+                headers={'x-total-pages': '3'},
+                json=first_response,
+            )
+            second_response = [{'id': 2}]
+            m.get(
+                'https://app.cardiomatics.com/api/v2/signals?page=2&per_page=1',
+                status_code=200,
+                headers={'x-total-pages': '3'},
+                json=second_response,
+            )
+            third_response = [{'id': 3}]
+            m.get(
+                'https://app.cardiomatics.com/api/v2/signals?page=3&per_page=1',
+                status_code=200,
+                headers={'x-total-pages': '3'},
+                json=third_response,
+            )
+
+            responses = list(self.api_service.get_list_signals_batches())
+
+            assert responses == [first_response, second_response, third_response]
+
+            assert m.call_count == 3
 
 
 if __name__ == '__main__':
