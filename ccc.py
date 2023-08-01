@@ -91,7 +91,7 @@ class APIService:
             raise NotImplementedError
 
     def upload_file_to_object_storage(self, url, file, post_fields):
-        """_summary_
+        """Uploads file to object store as multipart/form request
 
         :param url: object storage url
         :param file: file object (opened)
