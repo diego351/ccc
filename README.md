@@ -12,7 +12,7 @@
 
 ## General usage
 
-1. List: `python ccc.py list —-access-token token`
-2. Upload: `python ccc.py upload --file-path /file/path/RECORD.GTM  --name name —-access-token=token`
-3. Download: `python ccc.py download --dir-path /tmp -—access-token=token`
-4. Download nw: `python ccc.py download --dir-path /tmp --new -—access-token=token`
+1. List: `python ccc.py list --access-token=token`
+2. Upload: `python ccc.py upload --file-path /file/path/RECORD.GTM --name name --access-token=token`
+3. Download: `python ccc.py download --dir-path /tmp --access-token=token`
+4. Download nw: `python ccc.py download --dir-path /tmp --new --access-token=token`
