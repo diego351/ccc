@@ -11,7 +11,7 @@ import requests
 from tabulate import tabulate
 from tqdm import tqdm
 
-INVALUD_TOKEN_MESSAGE = "\nInvalid token"
+INVALUD_TOKEN_MESSAGE = "Invalid token"
 LIST_ACTION = 'list'
 UPLOAD_ACTION = 'upload'
 DOWNLOAD_ACTION = 'download'
@@ -63,7 +63,7 @@ class APIService:
         if response.status_code == 401:
             raise self.AccessDeniedError
 
-        elif response.status_code == 200:
+        elif response.ok:
             last_page = response.headers['x-total-pages']
             return (int(last_page), response.json())
 
@@ -86,7 +86,7 @@ class APIService:
         if response.status_code == 401:
             raise self.AccessDeniedError
 
-        elif response.status_code == 201:
+        elif response.ok:
             return response.json()
 
         else:
@@ -143,7 +143,7 @@ class APIService:
         if response.status_code == 403:
             raise self.NotVisitedBeforeViaPortalError
 
-        elif response.status_code == 200:
+        elif response.ok:
             return response.json()
 
         else:
